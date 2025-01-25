@@ -1,73 +1,215 @@
+// ts-ignore
+
 import { useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-// import * as pdfjsLib from "pdfjs-dist";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-// import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
-
-// pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-// // const workerSrc = require("pdfjs-dist/build/pdf.worker");
-// // pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-
-// pdfjs.GlobalWorkerOptions.workerSrc =
-// 	"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
 
-const PdfViewer = () => {
-	const [file, setFile] = useState(null);
-	const [numPages, setNumPages] = useState(null);
-	const [currentPage, setCurrentPage] = useState(1);
-	const [annotations, setAnnotations] = useState({});
-	const pdfWrapperRef = useRef(null);
-	const canvasRef = useRef(null);
-	const [formSchema, setFormSchema] = useState<
-		{ type: string; x: string; y: string }[]
-	>([]);
+interface Coordinates {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
 
-	const onFileChange = (event) => {
+interface Field {
+	type: keyof typeof fieldOptions;
+	coordinates: Coordinates;
+	page: number;
+}
+
+interface FileChangeEvent extends React.ChangeEvent<HTMLInputElement> {
+	target: HTMLInputElement & { files: FileList };
+}
+
+interface MouseEventWithCoords extends React.MouseEvent<HTMLCanvasElement> {
+	clientX: number;
+	clientY: number;
+}
+
+const fieldOptions = {
+	1: "Input",
+	2: "Textarea",
+	3: "Select",
+	4: "Checkbox",
+};
+
+const PdfViewer = () => {
+	const [file, setFile] = useState<string | null>(null);
+	const [numPages, setNumPages] = useState<number | null>(null);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [annotations, setAnnotations] = useState<{
+		[key: number]: { x: number; y: number; width: number; height: number }[];
+	}>({});
+	const [formSchema, setFormSchema] = useState<
+		{
+			type: keyof typeof fieldOptions;
+			coordinates: { x: number; y: number; width: number; height: number };
+			page: number;
+		}[]
+	>([]);
+	const pdfWrapperRef = useRef(null);
+	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const [isDrawing, setIsDrawing] = useState(false);
+	const [startCoords, setStartCoords] = useState({ x: 0, y: 0 });
+	const [endCoords, setEndCoords] = useState({ x: 0, y: 0 });
+	const [showFieldOptions, setShowFieldOptions] = useState(false);
+	const [selectedRect, setSelectedRect] = useState<Coordinates | null>(null);
+
+	const onFileChange = (event: FileChangeEvent) => {
 		const uploadedFile = event.target.files[0];
 		if (uploadedFile) {
 			setFile(URL.createObjectURL(uploadedFile));
-			setCurrentPage(1); // Reset à la première page
-			setAnnotations({}); // Reset annotations
+			setCurrentPage(1);
+			setAnnotations({});
+			setFormSchema([]);
 		}
 	};
 
-	const handlePdfClick = (event) => {
-		if (!pdfWrapperRef.current) return;
+	const getCanvasCoordinates = (
+		clientX: number,
+		clientY: number
+	): Coordinates => {
+		if (!canvasRef.current) return { x: 0, y: 0, width: 0, height: 0 };
 
-		const rect = pdfWrapperRef.current.getBoundingClientRect();
+		const canvas = canvasRef.current;
+		const rect = canvas.getBoundingClientRect();
 
-		console.log(rect, event.clientX);
-		const x = event.clientX - rect.left;
-		const y = event.clientY - rect.top;
+		// Adjust for canvas scaling
+		const scaleX = canvas.width / rect.width;
+		const scaleY = canvas.height / rect.height;
 
+		const x = (clientX - rect.left) * scaleX;
+		const y = (clientY - rect.top) * scaleY;
+
+		return { x, y, width: 0, height: 0 };
+	};
+
+	const handleMouseDown = (event: MouseEventWithCoords) => {
+		if (!canvasRef.current) return;
+
+		const { x, y } = getCanvasCoordinates(event.clientX, event.clientY);
+		setIsDrawing(true);
+		setStartCoords({ x, y });
+		setEndCoords({ x, y });
+	};
+
+	const handleMouseMove = (event: MouseEventWithCoords) => {
+		if (!isDrawing || !canvasRef.current) return;
+
+		const { x, y } = getCanvasCoordinates(event.clientX, event.clientY);
+		setEndCoords({ x, y });
+		drawCanvas();
+	};
+
+	const handleMouseUp = () => {
+		if (!isDrawing) return;
+
+		setIsDrawing(false);
+		setShowFieldOptions(true);
+		saveRectangle();
+	};
+
+	const drawCanvas = () => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		// Draw existing annotations
+		(annotations[currentPage] || []).forEach((rect) => {
+			ctx.fillStyle = "rgba(18, 189, 18, 0.3)";
+			ctx.strokeStyle = "black";
+			ctx.lineWidth = 0.001;
+			ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+			ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+		});
+
+		// Draw the current rectangle being drawn
+		if (isDrawing) {
+			ctx.fillStyle = "rgba(0, 0, 255, 0.2)";
+			ctx.strokeStyle = "black";
+			ctx.lineWidth = 0.01;
+			const width = endCoords.x - startCoords.x;
+			const height = endCoords.y - startCoords.y;
+			ctx.fillRect(startCoords.x, startCoords.y, width, height);
+			ctx.strokeRect(startCoords.x, startCoords.y, width, height);
+		}
+	};
+
+	const saveRectangle = () => {
+		const width = endCoords.x - startCoords.x;
+		const height = endCoords.y - startCoords.y;
+
+		if (width === 0 || height === 0) return;
+
+		const newRect = {
+			x: startCoords.x,
+			y: startCoords.y,
+			width,
+			height,
+		};
+
+		setSelectedRect(newRect);
+	};
+
+	const handleFieldSelect = (fieldType: string) => {
+		if (!selectedRect) return;
+
+		const newField: Field = {
+			type: fieldType as unknown as keyof typeof fieldOptions,
+			coordinates: selectedRect,
+			page: currentPage,
+		};
+
+		setFormSchema((prev) => [...prev, newField]);
 		setAnnotations((prev) => ({
 			...prev,
-			[currentPage]: [...(prev[currentPage] || []), { x, y }],
+			[currentPage]: [...(prev[currentPage] || []), selectedRect],
 		}));
+
+		setShowFieldOptions(false);
+		setSelectedRect(null);
+	};
+
+	const undoLastSelection = () => {
+		if (formSchema.length === 0) return;
+
+		const lastField = formSchema[formSchema.length - 1] as {
+			type: number;
+			coordinates: { x: number; y: number; width: number; height: number };
+			page: number;
+		};
+		const updatedFormSchema = formSchema.slice(0, -1);
+
+		setFormSchema(updatedFormSchema);
+
+		// Remove the last annotation from the canvas
+		const updatedAnnotations = { ...annotations };
+		updatedAnnotations[lastField.page] = updatedAnnotations[
+			lastField.page
+		].filter(
+			(rect) =>
+				rect.x !== lastField.coordinates.x ||
+				rect.y !== lastField.coordinates.y ||
+				rect.width !== lastField.coordinates.width ||
+				rect.height !== lastField.coordinates.height
+		);
+
+		setAnnotations(updatedAnnotations);
 	};
 
 	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas || !pdfWrapperRef.current) return;
-
-		const ctx = canvas.getContext("2d");
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-		(annotations[currentPage] || []).forEach(({ x, y }) => {
-			ctx.beginPath();
-			ctx.arc(x, y, 5, 0, 2 * Math.PI);
-			ctx.fillStyle = "red";
-			ctx.fill();
-		});
+		drawCanvas();
 	}, [annotations, currentPage]);
 
 	const goToPrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
 	const goToNextPage = () =>
-		setCurrentPage((prev) => Math.min(prev + 1, numPages));
+		setCurrentPage((prev) => Math.min(prev + 1, numPages || 1));
 
 	return (
 		<div
@@ -77,23 +219,45 @@ const PdfViewer = () => {
 				{file ? (
 					<>
 						<p>
-							{" "}
 							<strong>Select Form Field on Pdf</strong>
 						</p>
 						<ul>
-							{(annotations[currentPage] || []).map((point, index) => (
-								<li key={index}>
-									({Math.round(point.x)}, {Math.round(point.y)})
+							{formSchema.map((field, index) => (
+								<li
+									key={index}
+									style={{
+										backgroundColor:
+											field.page === currentPage ? "#f0f0f0" : "transparent",
+										padding: "5px",
+										margin: "2px 0",
+										borderRadius: "4px",
+									}}
+								>
+									{fieldOptions[field.type]} at (
+									{Math.round(field.coordinates.x)},{" "}
+									{Math.round(field.coordinates.y)}) - Width:{" "}
+									{Math.round(field.coordinates.width)}, Height:{" "}
+									{Math.round(field.coordinates.height)} (Page {field.page})
 								</li>
 							))}
 						</ul>
+
+						{showFieldOptions && (
+							<NewFieldOptions onSelect={handleFieldSelect} />
+						)}
+
+						<button
+							onClick={undoLastSelection}
+							disabled={formSchema.length === 0}
+						>
+							Undo Last Selection
+						</button>
 					</>
 				) : (
 					<p>Upload File </p>
 				)}
 			</div>
 
-			{/* Affichage du PDF avec navigation */}
 			<div>
 				<div>
 					<input type="file" accept="application/pdf" onChange={onFileChange} />
@@ -116,7 +280,9 @@ const PdfViewer = () => {
 								</Document>
 								<canvas
 									ref={canvasRef}
-									onClick={handlePdfClick}
+									onMouseDown={handleMouseDown}
+									onMouseMove={handleMouseMove}
+									onMouseUp={handleMouseUp}
 									style={{
 										position: "absolute",
 										top: 0,
@@ -138,7 +304,7 @@ const PdfViewer = () => {
 								</span>
 								<button
 									onClick={goToNextPage}
-									disabled={currentPage >= numPages}
+									disabled={numPages !== null && currentPage >= numPages}
 								>
 									Next ➡️
 								</button>
@@ -153,23 +319,25 @@ const PdfViewer = () => {
 
 export default PdfViewer;
 
-const NewFieldOptions = () => {
+const NewFieldOptions = ({
+	onSelect,
+}: {
+	onSelect: (fieldType: string) => void;
+}) => {
+	const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+		onSelect(event.target.value);
+	};
+
 	return (
 		<div>
-			<label htmlFor="field"></label>
-			<select name="field" id="field">
-				<option value="" selected>
-					Select Field Type
-				</option>
-				<option value="1" selected>
-					Input
-				</option>
-				<option value="2" selected>
-					Select Dropdown
-				</option>
-				<option value="3" selected>
-					Textarea
-				</option>
+			<label htmlFor="field">Select Field Type</label>
+			<select name="field" id="field" onChange={handleChange}>
+				<option value="">Select Field Type</option>
+				{Object.entries(fieldOptions).map(([key, value]) => (
+					<option key={key} value={key}>
+						{value}
+					</option>
+				))}
 			</select>
 		</div>
 	);
