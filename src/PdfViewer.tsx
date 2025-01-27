@@ -57,6 +57,7 @@ const PdfViewer = () => {
 	const [endCoords, setEndCoords] = useState({ x: 0, y: 0 });
 	const [showFieldOptions, setShowFieldOptions] = useState(false);
 	const [selectedRect, setSelectedRect] = useState<Coordinates | null>(null);
+	const [startSelection, setStartSelection] = useState(false);
 
 	const onFileChange = (event: FileChangeEvent) => {
 		const uploadedFile = event.target.files[0];
@@ -88,7 +89,7 @@ const PdfViewer = () => {
 	};
 
 	const handleMouseDown = (event: MouseEventWithCoords) => {
-		if (!canvasRef.current) return;
+		if (!canvasRef.current || !startSelection) return;
 
 		const { x, y } = getCanvasCoordinates(event.clientX, event.clientY);
 		setIsDrawing(true);
@@ -97,7 +98,7 @@ const PdfViewer = () => {
 	};
 
 	const handleMouseMove = (event: MouseEventWithCoords) => {
-		if (!isDrawing || !canvasRef.current) return;
+		if (!isDrawing || !canvasRef.current || !startSelection) return;
 
 		const { x, y } = getCanvasCoordinates(event.clientX, event.clientY);
 		setEndCoords({ x, y });
@@ -105,7 +106,7 @@ const PdfViewer = () => {
 	};
 
 	const handleMouseUp = () => {
-		if (!isDrawing) return;
+		if (!isDrawing || !startSelection) return;
 
 		setIsDrawing(false);
 		setShowFieldOptions(true);
@@ -114,7 +115,7 @@ const PdfViewer = () => {
 
 	const drawCanvas = () => {
 		const canvas = canvasRef.current;
-		if (!canvas) return;
+		if (!canvas || !startSelection) return;
 
 		const ctx = canvas.getContext("2d");
 		if (!ctx) return;
@@ -158,7 +159,7 @@ const PdfViewer = () => {
 	};
 
 	const handleFieldSelect = (fieldType: string) => {
-		if (!selectedRect) return;
+		if (!selectedRect || !startSelection) return;
 
 		const newField: Field = {
 			type: fieldType as unknown as keyof typeof fieldOptions,
@@ -174,6 +175,7 @@ const PdfViewer = () => {
 
 		setShowFieldOptions(false);
 		setSelectedRect(null);
+		setStartSelection(false);
 	};
 
 	const undoLastSelection = () => {
@@ -263,7 +265,13 @@ const PdfViewer = () => {
 					<input type="file" accept="application/pdf" onChange={onFileChange} />
 
 					{file && (
-						<>
+						<div>
+							<div style={{ display: "flex" }}>
+								<p>Toolbar</p>
+								<button onClick={() => setStartSelection(true)}>
+									Start Selection
+								</button>
+							</div>
 							<div
 								style={{
 									position: "relative",
@@ -289,7 +297,7 @@ const PdfViewer = () => {
 										left: 0,
 										width: "100%",
 										height: "100%",
-										cursor: "crosshair",
+										cursor: startSelection ? "crosshair" : "default",
 										zIndex: 1000,
 									}}
 								/>
@@ -309,7 +317,7 @@ const PdfViewer = () => {
 									Next ➡️
 								</button>
 							</div>
-						</>
+						</div>
 					)}
 				</div>
 			</div>
