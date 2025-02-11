@@ -36,6 +36,7 @@ const PdfViewerThree = () => {
 	const [newFieldType, setNewFieldType] = useState<string | null>(null);
 	const { editor, onReady } = useFabricJSEditor();
 	const [rect, setRect] = useState<fabric.Rect | null>(null); // Track the rectangle object
+	const [fileName, setFileName] = useState("");
 
 	useEffect(() => {
 		if (!editor || !fabric || !file) {
@@ -87,8 +88,13 @@ const PdfViewerThree = () => {
 		if (uploadedFile) {
 			setFile(URL.createObjectURL(uploadedFile));
 			setCurrentPage(1);
+			setFileName(uploadedFile.name);
 		} else {
-			setFile(null); // Reset file state if no file is selected
+			setFile(null);
+			setFileName("");
+			setFormSchema([]);
+			setShowFieldOptions(false);
+			setNewFieldType("");
 		}
 	};
 
@@ -154,8 +160,19 @@ const PdfViewerThree = () => {
 		setCurrentPage((prev) => Math.min(prev + 1, numPages || 1));
 
 	return (
-		<div className="min-h-full w-full text-center">
-			<input type="file" accept=".pdf" onChange={onFileChange} />
+		<div className="min-h-full w-full text-center p-16 pt-8">
+			<div className="w-full my-4 min-h-[150px] bg-gray-100 rounded-md flex flex-col justify-center items-center relative border-2 border-dashed border-gray-300 hover:border-gray-400 transition cursor-pointer">
+				<input
+					id="fileInput"
+					className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+					type="file"
+					accept=".pdf"
+					onChange={onFileChange}
+				/>
+				<label htmlFor="fileInput" className="text-gray-600 font-medium">
+					{fileName ? fileName : "Click or Drag to Upload File"}
+				</label>
+			</div>
 
 			<div className="w-full min-h-full grid grid-cols-2 gap-4 mt-8">
 				<div className="shadow-sm min-h-[500px]">
