@@ -46,6 +46,40 @@ const PdfViewerThree = () => {
 		}
 	}, [editor, file]);
 
+	useEffect(() => {
+		if (!editor?.canvas || !file) return;
+
+		// Clear existing rectangles
+		editor.canvas.getObjects().forEach((obj) => {
+			if (obj instanceof fabric.Rect) {
+				editor.canvas.remove(obj);
+			}
+		});
+
+		// Render saved fields for the current page
+		formSchema
+			.filter((field) => field.page === currentPage)
+			.forEach((field) => {
+				if (field.coordinates) {
+					const rect = new fabric.Rect({
+						left: field.coordinates.x,
+						top: field.coordinates.y,
+						width: field.coordinates.width,
+						height: field.coordinates.height,
+						fill: "rgba(0, 255, 0, 0.3)", // Different color for saved fields
+						stroke: "green",
+						strokeWidth: 2,
+						lockRotation: true,
+						selectable: false, // Make saved fields non-selectable
+						objectCaching: false,
+					});
+					editor.canvas.add(rect);
+				}
+			});
+
+		editor.canvas.renderAll();
+	}, [currentPage, formSchema, editor, file]);
+
 	const onFileChange = (event: FileChangeEvent) => {
 		const uploadedFile = event.target.files[0];
 		if (uploadedFile) {
@@ -90,12 +124,12 @@ const PdfViewerThree = () => {
 			return;
 		}
 
-		// Extract coordinates from the rectangle
+		// Extract coordinates and dimensions from the rectangle
 		const coordinates = {
 			x: rect.left || 0,
 			y: rect.top || 0,
-			width: rect.width || 0,
-			height: rect.height || 0,
+			width: rect.getScaledWidth() || 0, // Use getScaledWidth() for actual width
+			height: rect.getScaledHeight() || 0, // Use getScaledHeight() for actual height
 		};
 
 		// Save the field with coordinates
@@ -113,6 +147,39 @@ const PdfViewerThree = () => {
 		setRect(null);
 	};
 
+	// const saveField = () => {
+	// 	if (!rect) {
+	// 		console.error("No rectangle found");
+	// 		return;
+	// 	}
+
+	// 	console.log(rect);
+
+	// 	// Extract coordinates from the rectangle
+	// 	const coordinates = {
+	// 		x: rect.left || 0,
+	// 		y: rect.top || 0,
+	// 		width: rect.width || 0,
+	// 		height: rect.height || 0,
+	// 	};
+
+	// 	console.log("ooooo", coordinates);
+
+	// 	// Save the field with coordinates
+	// 	setFormSchema((prev) => [
+	// 		...prev,
+	// 		{
+	// 			type: newFieldType as keyof typeof fieldOptions,
+	// 			page: currentPage,
+	// 			coordinates,
+	// 		},
+	// 	]);
+
+	// 	// Reset state
+	// 	setNewFieldType(null);
+	// 	setRect(null);
+	// };
+
 	const goToPrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
 	const goToNextPage = () =>
 		setCurrentPage((prev) => Math.min(prev + 1, numPages || 1));
@@ -126,8 +193,22 @@ const PdfViewerThree = () => {
 					<div className="text-left">Timeline Steps</div>
 					<div className="p-8">
 						{!file && <p>Upload a file to start</p>}
-						{formSchema.map((item) => (
-							<>Item Added</>
+						{formSchema.map((item, index) => (
+							<div key={index} className="text-left mb-2">
+								<p>
+									<strong>Type:</strong> {fieldOptions[item.type]}
+								</p>
+								<p>
+									<strong>Page:</strong> {item.page}
+								</p>
+								{item.coordinates && (
+									<p>
+										<strong>Coordinates:</strong>{" "}
+										{`x: ${item.coordinates.x}, y: ${item.coordinates.y}, width: ${item.coordinates.width}, height: ${item.coordinates.height}`}
+									</p>
+								)}
+								<hr className="my-2" />
+							</div>
 						))}
 						{file && (
 							<div className="flex flex-col justify-start">
