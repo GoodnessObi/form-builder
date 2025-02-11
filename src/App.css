@@ -1,15 +1,36 @@
-#root {
-	max-width: 1280px;
-	margin: 0 auto;
-	padding: 2rem;
-	text-align: center;
+@import "tailwindcss";
+
+#root,
+body {
+	width: 100%;
 }
 
-.page {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
+canvas {
+	/* width: 100%; sty */
+	border: 1px solid #ccc;
+	box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-.pdf {
-	position: relative;
+button {
+	margin: 0 5px;
+	padding: 5px 10px;
+	cursor: pointer;
+}
+
+button:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.selected-fields {
+	margin-top: 20px;
+}
+
+.selected-fields ul {
+	list-style-type: none;
+	padding: 0;
+}
+
+.selected-fields li {
+	margin: 5px 0;
 }

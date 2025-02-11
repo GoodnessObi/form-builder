@@ -262,8 +262,6 @@ const PdfViewer = () => {
 
 			<div>
 				<div>
-					<input type="file" accept="application/pdf" onChange={onFileChange} />
-
 					{file && (
 						<div>
 							<div style={{ display: "flex" }}>
