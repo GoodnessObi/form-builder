@@ -1,5 +1,6 @@
 //ts-ignore
-import { useEffect, useRef, useState } from "react";
+
+import { useEffect, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -42,7 +43,6 @@ const PdfViewerThree = () => {
 		}
 
 		if (file) {
-			console.log("I rannnn");
 			editor.canvas.renderAll();
 		}
 	}, [editor, file]);
@@ -137,7 +137,7 @@ const PdfViewerThree = () => {
 		setFormSchema((prev) => [
 			...prev,
 			{
-				type: newFieldType as keyof typeof fieldOptions,
+				type: (newFieldType as unknown as keyof typeof fieldOptions) || null,
 				page: currentPage,
 				coordinates,
 			},
