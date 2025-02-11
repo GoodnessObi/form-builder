@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -32,6 +32,7 @@ const PdfViewerThree = () => {
 	const [formSchema, setFormSchema] = useState<Field[]>([]);
 	const [newFieldType, setNewFieldType] = useState<string | null>(null);
 	const { editor, onReady } = useFabricJSEditor();
+	const [rect, setRect] = useState<fabric.Rect | null>(null); // Track the rectangle object
 
 	useEffect(() => {
 		if (!editor || !fabric || !file) {
@@ -63,14 +64,12 @@ const PdfViewerThree = () => {
 	const addRectToCanvas = () => {
 		if (!editor) return;
 
-		// editor?.addRectangle();
-
 		const rect = new fabric.Rect({
 			left: 50,
 			top: 50,
 			width: 100,
 			height: 50,
-			fill: "rgba(0, 0, 0,0 )",
+			fill: "rgba(0, 0, 0, 0)",
 			stroke: "red",
 			strokeWidth: 2,
 			lockRotation: true,
@@ -79,16 +78,39 @@ const PdfViewerThree = () => {
 		});
 
 		editor.canvas.add(rect);
-
 		editor.canvas.renderAll();
+
+		// Store the rectangle object in state
+		setRect(rect);
 	};
 
 	const saveField = () => {
+		if (!rect) {
+			console.error("No rectangle found");
+			return;
+		}
+
+		// Extract coordinates from the rectangle
+		const coordinates = {
+			x: rect.left || 0,
+			y: rect.top || 0,
+			width: rect.width || 0,
+			height: rect.height || 0,
+		};
+
+		// Save the field with coordinates
 		setFormSchema((prev) => [
 			...prev,
-			{ type: newFieldType as keyof typeof fieldOptions, page: currentPage },
+			{
+				type: newFieldType as keyof typeof fieldOptions,
+				page: currentPage,
+				coordinates,
+			},
 		]);
+
+		// Reset state
 		setNewFieldType(null);
+		setRect(null);
 	};
 
 	const goToPrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -104,6 +126,9 @@ const PdfViewerThree = () => {
 					<div className="text-left">Timeline Steps</div>
 					<div className="p-8">
 						{!file && <p>Upload a file to start</p>}
+						{formSchema.map((item) => (
+							<>Item Added</>
+						))}
 						{file && (
 							<div className="flex flex-col justify-start">
 								{showFieldOptions ? (
