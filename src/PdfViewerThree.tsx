@@ -86,10 +86,25 @@ const PdfViewerThree = () => {
 	const onFileChange = (event: FileChangeEvent) => {
 		const uploadedFile = event.target.files[0];
 		if (uploadedFile) {
+			// Clear the canvas
+			if (editor?.canvas) {
+				editor.canvas.clear();
+			}
+
+			// Reset the form schema
+			setFormSchema([]);
+
+			// Set the new file and reset other states
 			setFile(URL.createObjectURL(uploadedFile));
 			setCurrentPage(1);
 			setFileName(uploadedFile.name);
 		} else {
+			// Clear the canvas
+			if (editor?.canvas) {
+				editor.canvas.clear();
+			}
+
+			// Reset all states
 			setFile(null);
 			setFileName("");
 			setFormSchema([]);
