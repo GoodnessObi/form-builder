@@ -1,6 +1,4 @@
-//ts-ignore
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -20,10 +18,13 @@ interface Field {
 }
 
 const fieldOptions = {
-	1: "Input",
+	1: "Textfield",
 	2: "Textarea",
 	3: "Select",
-	4: "Checkbox",
+	4: "Check box (Multiple Selection)",
+	5: "Date",
+	6: "Email",
+	7: "Toggle Switch",
 };
 
 const PdfViewerThree = () => {
@@ -148,39 +149,6 @@ const PdfViewerThree = () => {
 		setRect(null);
 	};
 
-	// const saveField = () => {
-	// 	if (!rect) {
-	// 		console.error("No rectangle found");
-	// 		return;
-	// 	}
-
-	// 	console.log(rect);
-
-	// 	// Extract coordinates from the rectangle
-	// 	const coordinates = {
-	// 		x: rect.left || 0,
-	// 		y: rect.top || 0,
-	// 		width: rect.width || 0,
-	// 		height: rect.height || 0,
-	// 	};
-
-	// 	console.log("ooooo", coordinates);
-
-	// 	// Save the field with coordinates
-	// 	setFormSchema((prev) => [
-	// 		...prev,
-	// 		{
-	// 			type: newFieldType as keyof typeof fieldOptions,
-	// 			page: currentPage,
-	// 			coordinates,
-	// 		},
-	// 	]);
-
-	// 	// Reset state
-	// 	setNewFieldType(null);
-	// 	setRect(null);
-	// };
-
 	const goToPrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
 	const goToNextPage = () =>
 		setCurrentPage((prev) => Math.min(prev + 1, numPages || 1));
@@ -276,8 +244,17 @@ const NewFieldOptions = ({
 	onSelect: (fieldType: string) => void;
 	saveField: () => void;
 }) => {
+	const selectRef = useRef<HTMLSelectElement>(null); // Ref to the select element
+
 	const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
 		onSelect(event.target.value);
+	};
+
+	const handleSave = () => {
+		saveField(); // Call the saveField function
+		if (selectRef.current) {
+			selectRef.current.value = ""; // Clear the select field
+		}
 	};
 
 	return (
@@ -287,6 +264,7 @@ const NewFieldOptions = ({
 					Select Field Type
 				</label>
 				<select
+					ref={selectRef} // Attach the ref
 					className="w-full border border-black rounded-sm p-2"
 					name="field"
 					id="field"
@@ -302,7 +280,7 @@ const NewFieldOptions = ({
 			</div>
 
 			<div className="w-1/2">
-				<button className="" type="button" onClick={saveField}>
+				<button className="" type="button" onClick={handleSave}>
 					Save
 				</button>
 
